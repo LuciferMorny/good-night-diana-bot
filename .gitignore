@@ -1,0 +1,12 @@
+# Секреты
+.env
+.deploy.secret
+
+# Runtime-данные (хранятся на сервере, не в репозитории)
+state.json
+logs.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

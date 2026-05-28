@@ -1,2 +1,15 @@
-# Auto detect text files and perform LF normalization
+# Автоматически нормализовать все текстовые файлы
 * text=auto
+
+# Явно указать LF для скриптов и кода (работает везде)
+*.js text eol=lf
+*.py text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.sh text eol=lf
+*.txt text eol=lf
+
+# Файлы, которые должны остаться с CRLF (редко нужно)
+*.bat text eol=crlf
+*.cmd text eol=crlf

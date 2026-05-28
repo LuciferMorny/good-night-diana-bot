@@ -1,0 +1,22 @@
+# Секреты
+.env
+.deploy.secret
+
+# Git
+.git
+.gitignore
+
+# Runtime-данные (монтируются как volumes)
+state.json
+logs.txt
+music/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Скрипты деплоя (не нужны внутри контейнера)
+deploy.sh
+push.ps1
+*.secret.example

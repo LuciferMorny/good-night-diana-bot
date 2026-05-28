@@ -1,0 +1,11 @@
+services:
+  bot:
+    build: .
+    container_name: for_diana_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./music:/app/music
+      - ./state.json:/app/state.json
+      - ./logs.txt:/app/logs.txt
