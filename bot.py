@@ -20,11 +20,12 @@ TIMEZONE = os.getenv("TIMEZONE", "Europe/Moscow")
 BUTTON_USERNAME = os.getenv("BUTTON_USERNAME")
 PREFILLED_MESSAGE = os.getenv("PREFILLED_MESSAGE", "")
 
-MESSAGES_FILE = Path("messages.txt")
-MUSIC_DIR = Path("music")
-STATE_FILE = Path("state.json")
-LOG_FILE = Path("logs.txt")
-USERS_FILE = Path("users.json")
+BASE_DIR = Path(__file__).resolve().parent
+MESSAGES_FILE = BASE_DIR / "messages.txt"
+MUSIC_DIR = BASE_DIR / "music"
+STATE_FILE = BASE_DIR / "state.json"
+LOG_FILE = BASE_DIR / "logs.txt"
+USERS_FILE = BASE_DIR / "users.json"
 
 AUDIO_EXTENSIONS = {".mp3", ".ogg", ".m4a", ".flac", ".wav", ".opus"}
 
@@ -77,19 +78,27 @@ def save_users(users: set[int]) -> None:
 
 async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    username = f"@{user.username}" if user.username else "нет ника"
+    if not user:
+        logger.warning("Команда /start: не удалось получить пользователя из update")
+        return
 
+    username = f"@{user.username}" if user.username else "нет ника"
     users = load_users()
     is_new = user.id not in users
     users.add(user.id)
     save_users(users)
 
+    logger.info("Команда /start от %s (%s, ID: %d)", user.full_name, username, user.id)
     write_log("КОМАНДА /start", {
         "Кто запустил": f"{user.full_name} ({username}, ID: {user.id})",
         "Статус": "новый пользователь" if is_new else "уже зарегистрирован",
     })
 
-    await update.message.reply_text("Ты подписан на ежедневные сообщения 💌")
+    message = update.message or update.effective_message
+    if message:
+        await message.reply_text("Ты подписан на ежедневные сообщения 💌")
+    else:
+        logger.warning("Команда /start: нет сообщения для ответа пользователю %s", username)
 
 
 async def send_daily_message(bot: Bot) -> None:
