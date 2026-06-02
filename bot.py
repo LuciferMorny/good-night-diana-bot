@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -39,7 +40,8 @@ logger = logging.getLogger(__name__)
 
 
 def write_log(event: str, details: dict) -> None:
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    tz = ZoneInfo(TIMEZONE)
+    now = datetime.now(tz).strftime("%d.%m.%Y %H:%M")
     lines = [f"\n{'─' * 48}", f"  {now}  |  {event}"]
     for key, value in details.items():
         lines.append(f"  {key}: {value}")
@@ -47,25 +49,36 @@ def write_log(event: str, details: dict) -> None:
         f.write("\n".join(lines) + "\n")
 
 
-async def send_log_to_admin(bot: Bot, event: str, details: dict) -> None:
-    """Отправляет лог админу в Телеграм, если ADMIN_ID указан и отличается от отправляемого пользователя"""
+async def send_log_to_admin(bot: Bot, event: str, details: dict, audio_file_path: Path = None) -> None:
+    """Отправляет лог админу в Телеграм, если ADMIN_ID указан. Может прикреплять аудиофайл."""
     if not ADMIN_ID:
         return
     
     try:
-        now = datetime.now().strftime("%d.%m.%Y %H:%M")
+        tz = ZoneInfo(TIMEZONE)
+        now = datetime.now(tz).strftime("%d.%m.%Y %H:%M")
         message_lines = [f"📋 **{event}**", f"⏱ {now}"]
         for key, value in details.items():
             message_lines.append(f"• {key}: {value}")
         
         message_text = "\n".join(message_lines)
         
-        # Отправляем только админу, проверяем что это не обычный пользователь
-        await bot.send_message(
-            chat_id=ADMIN_ID,
-            text=message_text,
-            parse_mode="Markdown"
-        )
+        # Если есть аудиофайл, отправляем его с текстом в подписи
+        if audio_file_path and audio_file_path.exists():
+            with open(audio_file_path, "rb") as audio_file:
+                await bot.send_audio(
+                    chat_id=ADMIN_ID,
+                    audio=audio_file,
+                    caption=message_text,
+                    parse_mode="Markdown"
+                )
+        else:
+            # Иначе отправляем просто текст
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=message_text,
+                parse_mode="Markdown"
+            )
     except Exception as e:
         logger.error("Ошибка отправки лога админу: %s", e)
 
@@ -229,17 +242,17 @@ async def send_daily_message(bot: Bot) -> None:
                 logger.error("Ошибка отправки пользователю %d: %s", user_id, e)
 
         write_log("РАССЫЛКА ЗАВЕРШЕНА", {
-            "Текст": f"«{short_text}»",
+            "Текст": f"«{text}»",
             "Музыка": song_path.name,
             "Отправлено": f"{sent_count} из {len(users)}",
             "Ошибок": error_count,
         })
         await send_log_to_admin(bot, "РАССЫЛКА ЗАВЕРШЕНА", {
-            "Текст": f"«{short_text}»",
+            "Текст": f"«{text}»",
             "Музыка": song_path.name,
             "Отправлено": f"{sent_count} из {len(users)}",
             "Ошибок": error_count,
-        })
+        }, audio_file_path=song_path)
         state["song_index"] = (song_idx + 1) % len(music_files)
     else:
         for user_id in users:
@@ -256,13 +269,13 @@ async def send_daily_message(bot: Bot) -> None:
                 logger.error("Ошибка отправки пользователю %d: %s", user_id, e)
 
         write_log("РАССЫЛКА ЗАВЕРШЕНА", {
-            "Текст": f"«{short_text}»",
+            "Текст": f"«{text}»",
             "Музыка": "нет",
             "Отправлено": f"{sent_count} из {len(users)}",
             "Ошибок": error_count,
         })
         await send_log_to_admin(bot, "РАССЫЛКА ЗАВЕРШЕНА", {
-            "Текст": f"«{short_text}»",
+            "Текст": f"«{text}»",
             "Музыка": "нет",
             "Отправлено": f"{sent_count} из {len(users)}",
             "Ошибок": error_count,
