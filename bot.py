@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 from dotenv import load_dotenv
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 load_dotenv()
@@ -19,6 +19,8 @@ SEND_TIME = os.getenv("SEND_TIME", "09:00")
 TIMEZONE = os.getenv("TIMEZONE", "Europe/Moscow")
 BUTTON_USERNAME = os.getenv("BUTTON_USERNAME")
 PREFILLED_MESSAGE = os.getenv("PREFILLED_MESSAGE", "")
+ADMIN_ID_STR = os.getenv("ADMIN_ID", "").strip()
+ADMIN_ID = int(ADMIN_ID_STR) if ADMIN_ID_STR else None
 
 BASE_DIR = Path(__file__).resolve().parent
 MESSAGES_FILE = BASE_DIR / "messages.txt"
@@ -43,6 +45,29 @@ def write_log(event: str, details: dict) -> None:
         lines.append(f"  {key}: {value}")
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+
+
+async def send_log_to_admin(bot: Bot, event: str, details: dict) -> None:
+    """Отправляет лог админу в Телеграм, если ADMIN_ID указан и отличается от отправляемого пользователя"""
+    if not ADMIN_ID:
+        return
+    
+    try:
+        now = datetime.now().strftime("%d.%m.%Y %H:%M")
+        message_lines = [f"📋 **{event}**", f"⏱ {now}"]
+        for key, value in details.items():
+            message_lines.append(f"• {key}: {value}")
+        
+        message_text = "\n".join(message_lines)
+        
+        # Отправляем только админу, проверяем что это не обычный пользователь
+        await bot.send_message(
+            chat_id=ADMIN_ID,
+            text=message_text,
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error("Ошибка отправки лога админу: %s", e)
 
 
 def load_messages() -> list[str]:
@@ -89,16 +114,63 @@ async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     save_users(users)
 
     logger.info("Команда /start от %s (%s, ID: %d)", user.full_name, username, user.id)
-    write_log("КОМАНДА /start", {
+    log_details = {
         "Кто запустил": f"{user.full_name} ({username}, ID: {user.id})",
         "Статус": "новый пользователь" if is_new else "уже зарегистрирован",
-    })
+    }
+    write_log("КОМАНДА /start", log_details)
+    await send_log_to_admin(context.bot, "КОМАНДА /start", log_details)
 
     message = update.message or update.effective_message
     if message:
         await message.reply_text("Ты подписан на ежедневные сообщения 💌")
     else:
         logger.warning("Команда /start: нет сообщения для ответа пользователю %s", username)
+
+
+async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Логирует все входящие сообщения"""
+    message = update.message
+    if not message or not message.text:
+        return
+    
+    user = update.effective_user
+    if not user:
+        return
+    
+    username = f"@{user.username}" if user.username else "нет ники"
+    text_preview = message.text if len(message.text) <= 100 else message.text[:100] + "..."
+    
+    logger.info("Сообщение от %s (ID: %d): %s", user.full_name, user.id, message.text)
+    log_details = {
+        "От": f"{user.full_name} ({username}, ID: {user.id})",
+        "Сообщение": text_preview,
+    }
+    write_log("СООБЩЕНИЕ ОТ ПОЛЬЗОВАТЕЛЯ", log_details)
+    await send_log_to_admin(context.bot, "СООБЩЕНИЕ ОТ ПОЛЬЗОВАТЕЛЯ", log_details)
+
+
+async def on_button_click(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Логирует нажатия кнопок"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    user = update.effective_user
+    if not user:
+        return
+    
+    username = f"@{user.username}" if user.username else "нет ники"
+    
+    logger.info("Нажата кнопка от %s (ID: %d): %s", user.full_name, user.id, query.data)
+    log_details = {
+        "От": f"{user.full_name} ({username}, ID: {user.id})",
+        "Кнопка": query.data,
+    }
+    write_log("НАЖАТА КНОПКА", log_details)
+    await send_log_to_admin(context.bot, "НАЖАТА КНОПКА", log_details)
+    
+    await query.answer()
 
 
 async def send_daily_message(bot: Bot) -> None:
@@ -162,6 +234,12 @@ async def send_daily_message(bot: Bot) -> None:
             "Отправлено": f"{sent_count} из {len(users)}",
             "Ошибок": error_count,
         })
+        await send_log_to_admin(bot, "РАССЫЛКА ЗАВЕРШЕНА", {
+            "Текст": f"«{short_text}»",
+            "Музыка": song_path.name,
+            "Отправлено": f"{sent_count} из {len(users)}",
+            "Ошибок": error_count,
+        })
         state["song_index"] = (song_idx + 1) % len(music_files)
     else:
         for user_id in users:
@@ -178,6 +256,12 @@ async def send_daily_message(bot: Bot) -> None:
                 logger.error("Ошибка отправки пользователю %d: %s", user_id, e)
 
         write_log("РАССЫЛКА ЗАВЕРШЕНА", {
+            "Текст": f"«{short_text}»",
+            "Музыка": "нет",
+            "Отправлено": f"{sent_count} из {len(users)}",
+            "Ошибок": error_count,
+        })
+        await send_log_to_admin(bot, "РАССЫЛКА ЗАВЕРШЕНА", {
             "Текст": f"«{short_text}»",
             "Музыка": "нет",
             "Отправлено": f"{sent_count} из {len(users)}",
@@ -203,6 +287,8 @@ async def main() -> None:
     bot = app.bot
 
     app.add_handler(CommandHandler("start", on_start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
+    app.add_handler(CallbackQueryHandler(on_button_click))
 
     hour, minute = map(int, SEND_TIME.split(":"))
 
