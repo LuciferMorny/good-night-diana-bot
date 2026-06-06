@@ -231,7 +231,6 @@ async def send_daily_message(bot: Bot) -> None:
                     audio=str(song_path),
                     caption=text,
                     reply_markup=keyboard,
-                    mime_type="audio/mpeg"
                 )
                 sent_count += 1
                 logger.info("Отправлено пользователю %d: сообщение #%d, песня «%s»", user_id, msg_idx, song_path.name)
