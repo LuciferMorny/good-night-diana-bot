@@ -235,13 +235,12 @@ async def send_daily_message(bot: Bot) -> None:
                         reply_markup=keyboard,
                     )
                 else:
-                    with open(song_path, "rb") as audio_file:
-                        msg = await bot.send_audio(
-                            chat_id=user_id,
-                            audio=audio_file,
-                            caption=text,
-                            reply_markup=keyboard,
-                        )
+                    msg = await bot.send_audio(
+                        chat_id=user_id,
+                        audio=str(song_path),
+                        caption=text,
+                        reply_markup=keyboard,
+                    )
                     file_id = msg.audio.file_id
                 sent_count += 1
                 logger.info("Отправлено пользователю %d: сообщение #%d, песня «%s»", user_id, msg_idx, song_path.name)
