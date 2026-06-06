@@ -223,25 +223,16 @@ async def send_daily_message(bot: Bot) -> None:
     if music_files:
         song_idx = state["song_index"] % len(music_files)
         song_path = music_files[song_idx]
-        file_id = None
 
         for user_id in users:
             try:
-                if file_id:
-                    await bot.send_audio(
-                        chat_id=user_id,
-                        audio=file_id,
-                        caption=text,
-                        reply_markup=keyboard,
-                    )
-                else:
-                    msg = await bot.send_audio(
-                        chat_id=user_id,
-                        audio=str(song_path),
-                        caption=text,
-                        reply_markup=keyboard,
-                    )
-                    file_id = msg.audio.file_id
+                msg = await bot.send_audio(
+                    chat_id=user_id,
+                    audio=str(song_path),
+                    caption=text,
+                    reply_markup=keyboard,
+                    mime_type="audio/mpeg"
+                )
                 sent_count += 1
                 logger.info("Отправлено пользователю %d: сообщение #%d, песня «%s»", user_id, msg_idx, song_path.name)
             except Exception as e:
