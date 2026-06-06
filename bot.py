@@ -52,11 +52,6 @@ def write_log(event: str, details: dict) -> None:
 async def send_log_to_admin(bot: Bot, event: str, details: dict, audio_file_path: Path = None) -> None:
     """Отправляет лог админу в Телеграм, если ADMIN_ID указан. Может прикреплять аудиофайл."""
     if not ADMIN_ID:
-        logger.debug("ADMIN_ID не задан, пропускаем отправку лога")
-        return
-    
-    if not bot:
-        logger.error("Bot объект не инициализирован при попытке отправить лог")
         return
     
     try:
@@ -68,8 +63,6 @@ async def send_log_to_admin(bot: Bot, event: str, details: dict, audio_file_path
         
         message_text = "\n".join(message_lines)
         
-        logger.debug("Отправляю лог админу (ID: %s): %s", ADMIN_ID, event)
-        
         # Если есть аудиофайл, отправляем его с текстом в подписи
         if audio_file_path and audio_file_path.exists():
             with open(audio_file_path, "rb") as audio_file:
@@ -79,7 +72,6 @@ async def send_log_to_admin(bot: Bot, event: str, details: dict, audio_file_path
                     caption=message_text,
                     parse_mode="Markdown"
                 )
-            logger.info("Лог с аудиофайлом отправлен админу: %s", event)
         else:
             # Иначе отправляем просто текст
             await bot.send_message(
@@ -87,9 +79,8 @@ async def send_log_to_admin(bot: Bot, event: str, details: dict, audio_file_path
                 text=message_text,
                 parse_mode="Markdown"
             )
-            logger.info("Лог отправлен админу: %s", event)
     except Exception as e:
-        logger.error("Ошибка отправки лога админу: %s", e, exc_info=True)
+        logger.error("Ошибка отправки лога админу: %s", e)
 
 
 def load_messages() -> list[str]:
@@ -161,11 +152,12 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     
     username = f"@{user.username}" if user.username else "нет ники"
+    text_preview = message.text if len(message.text) <= 100 else message.text[:100] + "..."
     
     logger.info("Сообщение от %s (ID: %d): %s", user.full_name, user.id, message.text)
     log_details = {
         "От": f"{user.full_name} ({username}, ID: {user.id})",
-        "Сообщение": message.text,
+        "Сообщение": text_preview,
     }
     write_log("СООБЩЕНИЕ ОТ ПОЛЬЗОВАТЕЛЯ", log_details)
     await send_log_to_admin(context.bot, "СООБЩЕНИЕ ОТ ПОЛЬЗОВАТЕЛЯ", log_details)
