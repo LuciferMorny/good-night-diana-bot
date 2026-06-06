@@ -1,0 +1,32 @@
+# This is an example configuration file
+# To learn more, see the full config.yaml reference: https://docs.continue.dev/reference
+
+name: Example Config
+version: 1.0.0
+schema: v1
+
+# Define which models can be used
+# https://docs.continue.dev/customization/models
+{
+  "models": [
+    {
+      "title": "Claude Opus 4.7",
+      "provider": "anthropic",
+      "model": "claude-opus-4-7",
+      "apiKey": "sk-claude-1bc0e07dd196818d6d6d99f220c1f614ac20e19edf299ba5fded95bb331ec4bb",
+      "apiBase": "https://api.claudeapi.pro"
+    },
+    {
+      "title": "Claude Sonnet 4.6",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "apiKey": "sk-claude-1bc0e07dd196818d6d6d99f220c1f614ac20e19edf299ba5fded95bb331ec4bb",
+      "apiBase": "https://api.claudeapi.pro"
+    }
+  ]
+}
+
+# MCP Servers that Continue can access
+# https://docs.continue.dev/customization/mcp-tools
+mcpServers:
+  - uses: anthropic/memory-mcp
